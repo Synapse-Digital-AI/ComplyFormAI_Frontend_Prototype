@@ -357,7 +357,7 @@ const PreBidAssessmentPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Organization Network Stats - NEW SECTION */}
+            {/* Organization Network Stats */}
             {assessment.organization_network && (
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -434,7 +434,7 @@ const PreBidAssessmentPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Matching Subcontractors */}
+            {/* Matching Subcontractors with Network Effects */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold mb-4">
                 Available Subcontractors from Directory ({matchingSubcontractors.length})
@@ -481,7 +481,7 @@ const PreBidAssessmentPage: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="flex gap-4 text-sm text-gray-600">
+                          <div className="flex gap-4 text-sm text-gray-600 mb-3">
                             {sub.contact_email && (
                               <div className="flex items-center gap-1">
                                 <Mail className="w-4 h-4" />
@@ -495,6 +495,19 @@ const PreBidAssessmentPage: React.FC = () => {
                               </div>
                             )}
                           </div>
+                          
+                          {/* Network Effects Badge - NEW */}
+                          {sub.contractors_using_count !== undefined && sub.contractors_using_count > 0 && (
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg shadow-sm">
+                              <Users className="w-4 h-4 text-emerald-600" />
+                              <span className="text-sm font-semibold text-emerald-800">
+                                {sub.contractors_using_count} contractor{sub.contractors_using_count !== 1 ? 's' : ''} trust{sub.contractors_using_count === 1 ? 's' : ''} this subcontractor
+                              </span>
+                              <span className="ml-1 px-2 py-0.5 bg-emerald-600 text-white text-xs rounded-full">
+                                Network Verified
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={() => handleContactSubcontractor(sub.id)}

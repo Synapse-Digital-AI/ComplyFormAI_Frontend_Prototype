@@ -11,7 +11,8 @@ import {
   Mail,
   Phone,
   Building,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 
 const SubcontractorDirectoryPage: React.FC = () => {
@@ -364,6 +365,19 @@ const SubcontractorDirectoryPage: React.FC = () => {
                     <div className="text-sm text-gray-600 mt-3">
                       <strong>Capabilities:</strong>
                       <p className="mt-1">{sub.capabilities}</p>
+                    </div>
+                  )}
+
+                  {/* Network Effects Badge - NEW */}
+                  {sub.contractors_using_count !== undefined && sub.contractors_using_count > 0 && (
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-800">
+                        {sub.contractors_using_count} {sub.contractors_using_count === 1 ? 'contractor' : 'contractors'} use{sub.contractors_using_count === 1 ? 's' : ''} this subcontractor
+                      </span>
+                      <span className="ml-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                        Trusted
+                      </span>
                     </div>
                   )}
                 </div>

@@ -113,6 +113,7 @@ export interface SubcontractorDirectory {
   location_city: string | null;
   rating: number;
   projects_completed: number;
+  contractors_using_count: number; // NEW: Network effects - how many contractors use this sub
   is_verified: boolean;
   created_at: string;
 }
