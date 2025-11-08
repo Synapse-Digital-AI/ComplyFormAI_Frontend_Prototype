@@ -118,7 +118,7 @@ const HomePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900">Manage</h3>
             </div>
             <p className="text-sm text-gray-600">
-              Organizations & subcontractors
+              Organizations
             </p>
           </button>
         </div>

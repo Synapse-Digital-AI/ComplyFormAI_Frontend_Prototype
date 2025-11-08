@@ -28,7 +28,7 @@ const SubcontractorDirectoryPage: React.FC = () => {
     is_mbe: undefined as boolean | undefined,
     is_vsbe: undefined as boolean | undefined,
     is_verified: undefined as boolean | undefined,
-    min_rating: undefined as number | undefined,
+    min_rating: '',
   });
 
   useEffect(() => {
@@ -63,7 +63,7 @@ const SubcontractorDirectoryPage: React.FC = () => {
         is_mbe: filters.is_mbe,
         is_vsbe: filters.is_vsbe,
         is_verified: filters.is_verified,
-        min_rating: filters.min_rating,
+        min_rating: filters.min_rating ? parseFloat(filters.min_rating) : undefined,
       });
       setSubcontractors(response.data);
     } catch (err) {
@@ -82,7 +82,7 @@ const SubcontractorDirectoryPage: React.FC = () => {
       is_mbe: undefined,
       is_vsbe: undefined,
       is_verified: undefined,
-      min_rating: undefined,
+      min_rating: '',
     });
     loadData();
   };
@@ -196,11 +196,11 @@ const SubcontractorDirectoryPage: React.FC = () => {
                 Min Rating
               </label>
               <select
-                value={filters.min_rating || ''}
+                value={filters.min_rating}
                 onChange={(e) =>
                   setFilters({
                     ...filters,
-                    min_rating: e.target.value ? parseFloat(e.target.value) : undefined,
+                    min_rating: e.target.value,
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
