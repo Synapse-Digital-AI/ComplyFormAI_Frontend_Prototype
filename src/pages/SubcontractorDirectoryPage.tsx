@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { directoryApi, jurisdictionsApi } from '../api/client';
-import { SubcontractorDirectory, Jurisdiction } from '../types';
+import { SubcontractorDirectory, Jurisdiction, SubcontractorDirectoryCreate } from '../types';
 import {
   ArrowLeft,
   Search,
@@ -12,7 +12,9 @@ import {
   Phone,
   Building,
   AlertCircle,
-  Users
+  Users,
+  Plus,
+  X
 } from 'lucide-react';
 
 const SubcontractorDirectoryPage: React.FC = () => {
@@ -21,6 +23,8 @@ const SubcontractorDirectoryPage: React.FC = () => {
   const [jurisdictions, setJurisdictions] = useState<Jurisdiction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
 
   const [filters, setFilters] = useState({
     query: '',
@@ -30,6 +34,25 @@ const SubcontractorDirectoryPage: React.FC = () => {
     is_vsbe: undefined as boolean | undefined,
     is_verified: undefined as boolean | undefined,
     min_rating: '',
+  });
+
+  const [formData, setFormData] = useState<SubcontractorDirectoryCreate>({
+    legal_name: '',
+    federal_id: '',
+    contact_email: '',
+    phone: '',
+    location_city: '',
+    capabilities: '',
+    certifications: {
+      mbe: false,
+      vsbe: false,
+      dbe: false,
+    },
+    jurisdiction_codes: [],
+    naics_codes: [],
+    rating: 0,
+    projects_completed: 0,
+    is_verified: false,
   });
 
   useEffect(() => {
@@ -88,6 +111,67 @@ const SubcontractorDirectoryPage: React.FC = () => {
     loadData();
   };
 
+  const handleCreateSubcontractor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setError(null);
+
+    try {
+      await directoryApi.create(formData);
+      setShowCreateModal(false);
+      // Reset form
+      setFormData({
+        legal_name: '',
+        federal_id: '',
+        contact_email: '',
+        phone: '',
+        location_city: '',
+        capabilities: '',
+        certifications: {
+          mbe: false,
+          vsbe: false,
+          dbe: false,
+        },
+        jurisdiction_codes: [],
+        naics_codes: [],
+        rating: 0,
+        projects_completed: 0,
+        is_verified: false,
+      });
+      // Reload data to show new subcontractor
+      loadData();
+    } catch (err) {
+      console.error('Failed to create subcontractor:', err);
+      setError('Failed to create subcontractor');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleJurisdictionToggle = (code: string) => {
+    const current = formData.jurisdiction_codes || [];
+    if (current.includes(code)) {
+      setFormData({
+        ...formData,
+        jurisdiction_codes: current.filter(c => c !== code),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        jurisdiction_codes: [...current, code],
+      });
+    }
+  };
+
+  const handleNaicsInput = (value: string) => {
+    // Split by comma and trim whitespace
+    const codes = value.split(',').map(c => c.trim()).filter(c => c);
+    setFormData({
+      ...formData,
+      naics_codes: codes,
+    });
+  };
+
   const renderRating = (rating: number) => {
     return (
       <div className="flex items-center gap-1">
@@ -126,13 +210,22 @@ const SubcontractorDirectoryPage: React.FC = () => {
           Back to Home
         </button>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Subcontractor Directory
-          </h1>
-          <p className="text-gray-600">
-            Search for certified subcontractors across Maryland and DC
-          </p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Subcontractor Directory
+            </h1>
+            <p className="text-gray-600">
+              Search for certified subcontractors across Maryland and DC
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create Subcontractor
+          </button>
         </div>
 
         {error && (
@@ -385,6 +478,288 @@ const SubcontractorDirectoryPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Create Subcontractor Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Create New Subcontractor</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateSubcontractor} className="p-6">
+                <div className="space-y-4">
+                  {/* Legal Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Legal Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.legal_name}
+                      onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Company Legal Name"
+                    />
+                  </div>
+
+                  {/* Federal ID */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Federal ID (EIN/Tax ID)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.federal_id}
+                      onChange={(e) => setFormData({ ...formData, federal_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="XX-XXXXXXX"
+                    />
+                  </div>
+
+                  {/* Contact Info Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Email
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.contact_email}
+                        onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="contact@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="(XXX) XXX-XXXX"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.location_city}
+                      onChange={(e) => setFormData({ ...formData, location_city: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Baltimore, MD"
+                    />
+                  </div>
+
+                  {/* Certifications */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Certifications
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.certifications?.mbe || false}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              certifications: {
+                                ...formData.certifications,
+                                mbe: e.target.checked,
+                              },
+                            })
+                          }
+                          className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">MBE</span>
+                      </label>
+
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.certifications?.vsbe || false}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              certifications: {
+                                ...formData.certifications,
+                                vsbe: e.target.checked,
+                              },
+                            })
+                          }
+                          className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">VSBE</span>
+                      </label>
+
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.certifications?.dbe || false}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              certifications: {
+                                ...formData.certifications,
+                                dbe: e.target.checked,
+                              },
+                            })
+                          }
+                          className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">DBE</span>
+                      </label>
+
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_verified || false}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              is_verified: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Verified</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Jurisdictions */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Jurisdictions
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {jurisdictions.map((j) => (
+                        <label
+                          key={j.id}
+                          className={`px-3 py-1 rounded-md border cursor-pointer transition-colors ${
+                            formData.jurisdiction_codes?.includes(j.code)
+                              ? 'bg-blue-100 border-blue-500 text-blue-700'
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.jurisdiction_codes?.includes(j.code) || false}
+                            onChange={() => handleJurisdictionToggle(j.code)}
+                            className="sr-only"
+                          />
+                          {j.code}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* NAICS Codes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      NAICS Codes
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.naics_codes?.join(', ') || ''}
+                      onChange={(e) => handleNaicsInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="236220, 238210, 238220 (comma-separated)"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Enter multiple codes separated by commas</p>
+                  </div>
+
+                  {/* Capabilities */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Capabilities
+                    </label>
+                    <textarea
+                      value={formData.capabilities}
+                      onChange={(e) => setFormData({ ...formData, capabilities: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Describe the company's capabilities and expertise..."
+                    />
+                  </div>
+
+                  {/* Rating and Projects */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rating (0-5)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.1"
+                        value={formData.rating}
+                        onChange={(e) =>
+                          setFormData({ ...formData, rating: parseFloat(e.target.value) || 0 })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Projects Completed
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.projects_completed}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            projects_completed: parseInt(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="mt-6 flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createLoading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {createLoading ? 'Creating...' : 'Create Subcontractor'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

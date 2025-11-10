@@ -57,6 +57,8 @@ export const subcontractorsApi = {
   update: (id: string, data: { legal_name?: string; certification_number?: string }) =>
     apiClient.put<Subcontractor>(`/subcontractors/${id}`, data),
   delete: (id: string) => apiClient.delete(`/subcontractors/${id}`),
+  create: (data: { organization_id: string; legal_name: string; certification_number?: string; is_mbe: boolean }) =>
+    apiClient.post<Subcontractor>('/subcontractors/', data),
 };
 
 // Bids

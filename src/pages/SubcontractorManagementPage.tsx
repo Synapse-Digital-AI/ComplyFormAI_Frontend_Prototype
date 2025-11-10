@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { subcontractorsApi, organizationsApi } from '../api/client';
-import { Subcontractor, Organization } from '../types';
-import { ArrowLeft, Users, Edit2, Trash2, AlertCircle, CheckCircle, Search } from 'lucide-react';
+import { subcontractorsApi, organizationsApi, directoryApi } from '../api/client';
+import { Subcontractor, Organization, SubcontractorDirectory } from '../types';
+import { ArrowLeft, Users, Edit2, Trash2, AlertCircle, CheckCircle, Search, Plus, X, Mail, Phone, CheckSquare } from 'lucide-react';
 
 const SubcontractorManagementPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +24,13 @@ const SubcontractorManagementPage: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mbeFilter, setMbeFilter] = useState<boolean | undefined>(undefined);
+
+  // Add from Directory Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [directorySubcontractors, setDirectorySubcontractors] = useState<SubcontractorDirectory[]>([]);
+  const [directorySearchQuery, setDirectorySearchQuery] = useState('');
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [selectedDirectorySub, setSelectedDirectorySub] = useState<SubcontractorDirectory | null>(null);
 
   useEffect(() => {
     loadData();
@@ -170,6 +177,57 @@ const SubcontractorManagementPage: React.FC = () => {
     return organizations.find(o => o.id === orgId)?.name || 'Unknown';
   };
 
+  const handleOpenAddModal = async () => {
+    setShowAddModal(true);
+    setDirectoryLoading(true);
+    try {
+      const response = await directoryApi.getAll(0, 100);
+      setDirectorySubcontractors(response.data);
+    } catch (err) {
+      console.error('Failed to load directory:', err);
+      setError('Failed to load directory');
+    } finally {
+      setDirectoryLoading(false);
+    }
+  };
+
+  const handleDirectorySearch = async () => {
+    setDirectoryLoading(true);
+    try {
+      const response = await directoryApi.simpleSearch({ q: directorySearchQuery });
+      setDirectorySubcontractors(response.data);
+    } catch (err) {
+      console.error('Directory search failed:', err);
+      setError('Directory search failed');
+    } finally {
+      setDirectoryLoading(false);
+    }
+  };
+
+  const handleAddFromDirectory = async () => {
+    if (!selectedDirectorySub || !orgFilter) return;
+
+    try {
+      // Create a new subcontractor in the organization's network based on directory data
+      await subcontractorsApi.create({
+        organization_id: orgFilter,
+        legal_name: selectedDirectorySub.legal_name,
+        certification_number: selectedDirectorySub.federal_id || undefined,
+        is_mbe: selectedDirectorySub.certifications?.mbe || false,
+      });
+
+      setSuccess(`Added ${selectedDirectorySub.legal_name} to your network!`);
+      setShowAddModal(false);
+      setSelectedDirectorySub(null);
+      setDirectorySearchQuery('');
+      await loadData();
+
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to add subcontractor to network');
+    }
+  };
+
   if (loading && subcontractors.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -213,6 +271,19 @@ const SubcontractorManagementPage: React.FC = () => {
           <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-start">
             <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
             <p className="text-green-700 text-sm">{success}</p>
+          </div>
+        )}
+
+        {/* Add from Directory Button - Only show when viewing network */}
+        {orgFilter && (
+          <div className="mb-6">
+            <button
+              onClick={handleOpenAddModal}
+              className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              Add from Directory
+            </button>
           </div>
         )}
 
@@ -374,6 +445,158 @@ const SubcontractorManagementPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Add from Directory Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Add from Directory</h2>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setSelectedDirectorySub(null);
+                    setDirectorySearchQuery('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={directorySearchQuery}
+                    onChange={(e) => setDirectorySearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleDirectorySearch()}
+                    placeholder="Search by name, jurisdiction, or capabilities..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleDirectorySearch}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              {/* Directory List */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {directoryLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : directorySubcontractors.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <p>No subcontractors found in the directory.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {directorySubcontractors.map((sub) => (
+                      <div
+                        key={sub.id}
+                        onClick={() => setSelectedDirectorySub(sub)}
+                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                          selectedDirectorySub?.id === sub.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg mb-2">{sub.legal_name}</h3>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {sub.certifications?.mbe && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                                  MBE
+                                </span>
+                              )}
+                              {sub.certifications?.vsbe && (
+                                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                                  VSBE
+                                </span>
+                              )}
+                              {sub.certifications?.dbe && (
+                                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs font-medium rounded">
+                                  DBE
+                                </span>
+                              )}
+                              {sub.is_verified && (
+                                <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded flex items-center gap-1">
+                                  <CheckSquare className="w-3 h-3" />
+                                  Verified
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-4 text-sm text-gray-600 mb-2">
+                              {sub.contact_email && (
+                                <div className="flex items-center gap-1">
+                                  <Mail className="w-4 h-4" />
+                                  {sub.contact_email}
+                                </div>
+                              )}
+                              {sub.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="w-4 h-4" />
+                                  {sub.phone}
+                                </div>
+                              )}
+                            </div>
+                            {sub.capabilities && (
+                              <p className="text-sm text-gray-600">
+                                <strong>Capabilities:</strong> {sub.capabilities}
+                              </p>
+                            )}
+                            {sub.contractors_using_count > 0 && (
+                              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <Users className="w-4 h-4 text-emerald-600" />
+                                <span className="text-sm font-semibold text-emerald-800">
+                                  {sub.contractors_using_count} contractor{sub.contractors_using_count !== 1 ? 's' : ''} trust this subcontractor
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {selectedDirectorySub?.id === sub.id && (
+                            <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setSelectedDirectorySub(null);
+                    setDirectorySearchQuery('');
+                  }}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddFromDirectory}
+                  disabled={!selectedDirectorySub}
+                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add to Network
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

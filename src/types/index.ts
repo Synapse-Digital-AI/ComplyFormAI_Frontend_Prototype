@@ -19,6 +19,11 @@ export interface Subcontractor {
   certifications?: Certification[];
 }
 
+export interface CategoryBreakdown {
+  category: string;
+  percentage: number;
+}
+
 export interface BidSubcontractor {
   id: string;
   bid_id: string;
@@ -27,6 +32,7 @@ export interface BidSubcontractor {
   naics_code: string;
   subcontract_value: number;
   counts_toward_mbe: boolean;
+  category_breakdown?: CategoryBreakdown[] | null;
   subcontractor?: Subcontractor;
 }
 
@@ -72,6 +78,7 @@ export interface BidSubcontractorCreateRequest {
   naics_code: string;
   subcontract_value: number;
   counts_toward_mbe: boolean;
+  category_breakdown?: CategoryBreakdown[] | null;
 }
 
 export interface OrganizationCreateRequest {

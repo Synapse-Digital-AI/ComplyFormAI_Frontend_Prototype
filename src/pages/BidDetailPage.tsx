@@ -80,9 +80,9 @@ const BidDetailPage: React.FC = () => {
 
   const mbeTotal = bid.bid_subcontractors
     ?.filter(bs => bs.counts_toward_mbe)
-    .reduce((sum, bs) => sum + bs.subcontract_value, 0) || 0;
-  
-  const mbePercentage = bid.total_amount > 0 
+    .reduce((sum, bs) => sum + (Number(bs.subcontract_value) || 0), 0) || 0;
+
+  const mbePercentage = bid.total_amount > 0
     ? (mbeTotal / bid.total_amount * 100).toFixed(2)
     : '0.00';
 

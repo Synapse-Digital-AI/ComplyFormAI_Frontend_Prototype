@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { subcontractorsApi, bidsApi } from '../api/client';
-import { Subcontractor } from '../types';
-import { Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { directoryApi, bidsApi } from '../api/client';
+import { SubcontractorDirectory } from '../types';
+import { Search, AlertCircle, CheckCircle, Plus, Trash2 } from 'lucide-react';
 
 interface SubcontractorFormProps {
   bidId: string;
   onSuccess: () => void;
 }
 
+interface BreakdownEntry {
+  category: string;
+  percentage: string;
+}
+
 const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess }) => {
-  const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
+  const [subcontractors, setSubcontractors] = useState<SubcontractorDirectory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +28,19 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
     counts_toward_mbe: false,
   });
 
+  const [breakdownEntries, setBreakdownEntries] = useState<BreakdownEntry[]>([]);
+  const [newBreakdown, setNewBreakdown] = useState<BreakdownEntry>({
+    category: 'MBE',
+    percentage: '',
+  });
+
   useEffect(() => {
     loadSubcontractors();
   }, []);
 
   const loadSubcontractors = async () => {
     try {
-      const response = await subcontractorsApi.getAll();
+      const response = await directoryApi.getAll();
       setSubcontractors(response.data);
     } catch (err) {
       console.error('Failed to load subcontractors:', err);
@@ -43,11 +54,35 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
     }
 
     try {
-      const response = await subcontractorsApi.search(searchQuery);
+      const response = await directoryApi.simpleSearch({ q: searchQuery });
       setSubcontractors(response.data);
     } catch (err) {
       console.error('Search failed:', err);
     }
+  };
+
+  const handleAddBreakdown = () => {
+    if (!newBreakdown.percentage || parseFloat(newBreakdown.percentage) <= 0) {
+      return;
+    }
+
+    // Check if category already exists
+    if (breakdownEntries.some(entry => entry.category === newBreakdown.category)) {
+      setError(`${newBreakdown.category} already added to breakdown`);
+      return;
+    }
+
+    setBreakdownEntries([...breakdownEntries, { ...newBreakdown }]);
+    setNewBreakdown({ category: 'MBE', percentage: '' });
+    setError(null);
+  };
+
+  const handleRemoveBreakdown = (index: number) => {
+    setBreakdownEntries(breakdownEntries.filter((_, i) => i !== index));
+  };
+
+  const getTotalPercentage = () => {
+    return breakdownEntries.reduce((sum, entry) => sum + parseFloat(entry.percentage || '0'), 0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,13 +91,53 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
     setError(null);
     setSuccess(false);
 
+    // Validate NAICS code format (2-6 digits)
+    const naicsCode = formData.naics_code.trim();
+    if (naicsCode && (!/^\d{2,6}$/.test(naicsCode))) {
+      setError('Invalid NAICS code. NAICS codes must be 2-6 digits (e.g., 236220).');
+      setLoading(false);
+      return;
+    }
+
+    // Validate breakdown percentages don't exceed 100
+    const totalPercentage = getTotalPercentage();
+    if (breakdownEntries.length > 0 && totalPercentage > 100) {
+      setError(`Breakdown percentages cannot exceed 100%. Current total: ${totalPercentage.toFixed(2)}%`);
+      setLoading(false);
+      return;
+    }
+
+    // Determine counts_toward_mbe based on breakdown entries
+    const countsTowardMbe = breakdownEntries.some(entry => entry.category === 'MBE');
+
     try {
+      // Prepare breakdown data for API - backend expects array format and exactly 100%
+      let breakdown = null;
+      if (breakdownEntries.length > 0) {
+        const mappedBreakdown = breakdownEntries.map(entry => ({
+          category: entry.category,
+          percentage: parseFloat(entry.percentage)
+        }));
+
+        // If total is less than 100%, add "Non-MBE" category with the remaining percentage
+        if (totalPercentage < 100) {
+          const remaining = parseFloat((100 - totalPercentage).toFixed(2));
+          mappedBreakdown.push({
+            category: 'Non-MBE',
+            percentage: remaining
+          });
+        }
+
+        breakdown = mappedBreakdown;
+      }
+
       await bidsApi.addSubcontractor(bidId, {
         subcontractor_id: formData.subcontractor_id,
         work_description: formData.work_description,
         naics_code: formData.naics_code,
         subcontract_value: parseFloat(formData.subcontract_value),
-        counts_toward_mbe: formData.counts_toward_mbe,
+        counts_toward_mbe: countsTowardMbe,
+        category_breakdown: breakdown,
       });
 
       setSuccess(true);
@@ -73,13 +148,37 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
         subcontract_value: '',
         counts_toward_mbe: false,
       });
+      setBreakdownEntries([]);
 
       setTimeout(() => {
         setSuccess(false);
         onSuccess();
       }, 1500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to add subcontractor');
+      // Handle different error response formats
+      let errorMessage = 'Failed to add subcontractor';
+
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+
+        // If detail is a string, use it directly
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        }
+        // If detail is an array of validation errors (FastAPI format)
+        else if (Array.isArray(detail)) {
+          errorMessage = detail.map((e: any) => {
+            const field = e.loc ? e.loc.join('.') : 'field';
+            return `${field}: ${e.msg}`;
+          }).join(', ');
+        }
+        // If detail is an object, try to extract a meaningful message
+        else if (typeof detail === 'object') {
+          errorMessage = detail.msg || detail.message || JSON.stringify(detail);
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -139,7 +238,7 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
               setFormData({
                 ...formData,
                 subcontractor_id: e.target.value,
-                counts_toward_mbe: selected?.is_mbe || false,
+                counts_toward_mbe: selected?.certifications?.mbe || false,
               });
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -148,7 +247,7 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
             <option value="">Select Subcontractor</option>
             {subcontractors.map((sub) => (
               <option key={sub.id} value={sub.id}>
-                {sub.legal_name} {sub.is_mbe && '(MBE)'}
+                {sub.legal_name} {sub.certifications?.mbe && '(MBE)'}
               </option>
             ))}
           </select>
@@ -198,16 +297,84 @@ const SubcontractorForm: React.FC<SubcontractorFormProps> = ({ bidId, onSuccess 
           />
         </div>
 
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.counts_toward_mbe}
-            onChange={(e) => setFormData({ ...formData, counts_toward_mbe: e.target.checked })}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-          />
-          <label className="ml-2 text-sm text-gray-700">
-            Count toward MBE goal
-          </label>
+        {/* Breakdown Section */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Category Breakdown
+            </label>
+            {breakdownEntries.length > 0 && (
+              <span className={`text-sm font-medium ${
+                getTotalPercentage() > 100 ? 'text-red-600' : 'text-gray-700'
+              }`}>
+                Total: {getTotalPercentage().toFixed(2)}%
+                {getTotalPercentage() < 100 && (
+                  <span className="text-gray-500 ml-1">
+                    (Non-MBE: {(100 - getTotalPercentage()).toFixed(2)}%)
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+
+          {/* Existing breakdown entries */}
+          {breakdownEntries.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {breakdownEntries.map((entry, index) => (
+                <div key={index} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                  <span className="flex-1 text-sm font-medium text-gray-700">
+                    {entry.category}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {entry.percentage}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBreakdown(index)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add new breakdown entry */}
+          <div className="flex gap-2">
+            <select
+              value={newBreakdown.category}
+              onChange={(e) => setNewBreakdown({ ...newBreakdown, category: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="MBE">MBE</option>
+              <option value="WBE">WBE</option>
+              <option value="SBE">SBE</option>
+              <option value="VSBE">VSBE</option>
+            </select>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={newBreakdown.percentage}
+              onChange={(e) => setNewBreakdown({ ...newBreakdown, percentage: e.target.value })}
+              placeholder="%"
+              className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleAddBreakdown}
+              className="px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-1 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 mt-2">
+            Add categories that apply to this subcontractor. Any remaining percentage is considered non-MBE allocation.
+          </p>
         </div>
 
         <button
