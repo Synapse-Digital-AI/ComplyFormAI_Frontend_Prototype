@@ -27,7 +27,7 @@ import {
   ComplianceRuleUpdate
 } from '../types';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = 'https://complyformai-p.onrender.com/api/v1';
 
 const apiClient = axios.create({
   baseURL: API_BASE,
