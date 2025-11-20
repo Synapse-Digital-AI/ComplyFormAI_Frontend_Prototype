@@ -11,7 +11,8 @@ import {
   Search,
   TrendingUp,
   AlertCircle,
-  Calendar
+  Calendar,
+  Shield
 } from 'lucide-react';
 
 const HomePage: React.FC = () => {
@@ -112,6 +113,21 @@ const HomePage: React.FC = () => {
             </div>
             <p className="text-sm text-gray-600">
               Search certified subcontractors
+            </p>
+          </button>
+
+          <button
+            onClick={() => navigate('/redaction/upload')}
+            className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow border-2 border-transparent hover:border-yellow-500 text-left"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Shield className="w-6 h-6 text-yellow-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Redaction</h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              Generate FOIA-compliant documents
             </p>
           </button>
 

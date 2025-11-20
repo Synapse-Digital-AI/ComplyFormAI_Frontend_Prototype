@@ -9,6 +9,9 @@ import SubcontractorDirectoryPage from './pages/SubcontractorDirectoryPage';
 import OpportunitiesPage from './pages/OpportunitiesPage';
 import PreBidAssessmentPage from './pages/PreBidAssessmentPage';
 import ComplianceRulesPage from './pages/ComplianceRulesPage';
+import RedactionUpload from './components/redaction/RedactionUpload';
+import RedactionEditor from './components/redaction/RedactionEditor';
+import RedactionPackage from './components/redaction/RedactionPackage';
 
 function App() {
   return (
@@ -23,6 +26,9 @@ function App() {
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/assessment/:opportunityId" element={<PreBidAssessmentPage />} />
         <Route path="/compliance-rules" element={<ComplianceRulesPage />} />
+        <Route path="/redaction/upload" element={<RedactionUpload />} />
+        <Route path="/redaction/editor" element={<RedactionEditor />} />
+        <Route path="/redaction/package" element={<RedactionPackage />} />
       </Routes>
     </BrowserRouter>
   );
